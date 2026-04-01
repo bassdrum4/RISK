@@ -979,13 +979,15 @@
         <h1 class="text-4xl font-bold mb-4 text-white font-orbitron">
           GLOBAL COMMAND v8.6
         </h1>
-        <button
-          id="secret-menu-button-global"
-          onclick="openSecretMenu()"
-          class="cyber-button w-full py-2 text-sm mb-4 hidden"
-        >
-          SECRET MENU
-        </button>
+        <div id="lobby-active-controls" class="hidden">
+          <button
+            id="secret-menu-button-global"
+            onclick="openSecretMenu()"
+            class="cyber-button w-full py-2 text-sm mb-4 hidden"
+          >
+            SECRET MENU
+          </button>
+        </div>
         <div id="host-section" class="hidden">
           <div class="text-xs text-cyan-600 mb-2">OPERATIVES LINKED:</div>
           <ul
@@ -1281,6 +1283,43 @@
           </button>
         </div>
       </div>
+      <!-- Input Modal -->
+      <div
+        id="input-modal"
+        class="hidden cyber-panel p-6 text-center"
+        style="
+          width: 420px;
+          z-index: 100;
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+        "
+      >
+        <h2 id="input-modal-title" class="text-xl text-yellow-500 font-bold mb-2">INPUT REQUIRED</h2>
+        <div id="input-modal-desc" class="text-xs text-cyan-400 mb-4">
+          Please enter the required information.
+        </div>
+        <input
+          id="input-modal-field"
+          type="text"
+          class="bg-black border border-cyan-700 p-3 w-full text-center text-xl text-yellow-500 outline-none mb-4"
+        />
+        <div class="flex gap-2">
+          <button
+            id="input-modal-cancel"
+            class="cyber-button flex-1 py-2 text-sm border-red-500 text-red-500"
+          >
+            CANCEL
+          </button>
+          <button
+            id="input-modal-confirm"
+            class="cyber-button flex-1 py-2 text-sm font-bold border-green-500 text-green-400"
+          >
+            CONFIRM
+          </button>
+        </div>
+      </div>
       <div
         id="victory-panel"
         class="cyber-panel p-10 w-[600px] text-center hidden"
@@ -1295,11 +1334,17 @@
         <h1 class="text-6xl font-bold mb-4 text-yellow-500 font-orbitron">
           VICTORY
         </h1>
-        <div id="winner-name" class="text-3xl text-white mb-6">PLAYER 1</div>
-        <div class="text-cyan-300 mb-8">GLOBAL DOMINATION ACHIEVED</div>
-        <button onclick="resetGame()" class="cyber-button px-8 py-3">
-          RESET SYSTEM
-        </button>
+        <div id="winner-name" class="text-3xl text-white mb-2">PLAYER 1</div>
+        <div class="text-cyan-300 mb-6">GLOBAL DOMINATION ACHIEVED</div>
+        <div id="victory-stats" class="text-left bg-black/50 border border-cyan-900 p-4 mb-8 max-h-64 overflow-y-auto"></div>
+        <div class="flex gap-4 justify-center">
+          <button onclick="resetGame()" class="cyber-button px-8 py-3">
+            RESET SYSTEM
+          </button>
+          <button onclick="document.getElementById('overlay-layer').classList.add('hidden')" class="cyber-button px-8 py-3 border-yellow-600 text-yellow-500">
+            VIEW MAP
+          </button>
+        </div>
       </div>
     </div>
     <!-- Secret menu modal (hidden) -->
@@ -1821,7 +1866,7 @@
         "AUSTRALIA",
       ];
       const C_BONUS = [5, 2, 5, 3, 7, 2];
-      const LOCS = [
+      const INITIAL_LOCS = [
         [8, 15, "Alaska", 0],
         [16, 12, "NW Terr", 0],
         [32, 8, "Greenland", 0],
@@ -1865,7 +1910,7 @@
         [88, 90, "W Aus", 5],
         [96, 90, "E Aus", 5],
       ];
-      const ADJ = {
+      const INITIAL_ADJ = {
         Alaska: ["NW Terr", "Alberta", "Kamchatka"],
         "NW Terr": ["Alaska", "Alberta", "Ontario", "Greenland"],
         Greenland: ["NW Terr", "Ontario", "Quebec", "Iceland"],
@@ -1944,6 +1989,18 @@
         "W Aus": ["Indo", "N Guinea", "E Aus"],
         "E Aus": ["N Guinea", "W Aus"],
       };
+      let LOCS = JSON.parse(JSON.stringify(INITIAL_LOCS));
+      let ADJ = JSON.parse(JSON.stringify(INITIAL_ADJ));
+      function ensureMapMatchesState() {
+        if (!state || !state.territories) return;
+        if (state.territories["Estonia"] && !LOCS.find((l) => l[2] === "Estonia")) {
+          LOCS.push([36, 6, "Estonia", -1]);
+          if (!ADJ["Estonia"]) ADJ["Estonia"] = ["Greenland"];
+          if (!ADJ["Greenland"]) ADJ["Greenland"] = [];
+          if (!ADJ["Greenland"].includes("Estonia"))
+            ADJ["Greenland"].push("Estonia");
+        }
+      }
       const CONTINENTS = [
         { name: "N. AMERICA", bonus: 5, ids: [0] },
         { name: "S. AMERICA", bonus: 2, ids: [1] },
@@ -1988,6 +2045,7 @@
         document.getElementById("secret-modal").classList.add("hidden");
         document.getElementById("saves-modal").classList.add("hidden");
         document.getElementById("victory-panel").classList.add("hidden");
+        document.getElementById("input-modal").classList.add("hidden");
         // Show the requested page
         const el = document.getElementById(pageId);
         if (el) {
@@ -2020,6 +2078,7 @@
         document.getElementById("secret-modal").classList.add("hidden");
         document.getElementById("saves-modal").classList.add("hidden");
         document.getElementById("victory-panel").classList.add("hidden");
+        document.getElementById("input-modal").classList.add("hidden");
         // Unhide current page
         const el = document.getElementById(currentPage);
         if (el) {
@@ -2168,9 +2227,10 @@
             if (!remoteState) return;
             state = sessionRepo.composeState(remoteState, currentRoster);
             syncMyPlayerIndexFromState();
-            if (state.phase !== "LOBBY") {
+            if (state.phase !== "LOBBY" && state.phase !== "GAME_OVER") {
               document.getElementById("overlay-layer").classList.add("hidden");
             }
+            ensureMapMatchesState();
             updateLobbyUI();
             updateHUD();
             requestAnimationFrame(drawLoop);
@@ -2795,22 +2855,67 @@
         state.gameId = id;
         return id;
       }
+      function openInputModal(title, desc, defaultValue, onConfirm) {
+        document.getElementById("input-modal-title").innerText = title;
+        document.getElementById("input-modal-desc").innerText = desc;
+        const field = document.getElementById("input-modal-field");
+        field.value = defaultValue || "";
+        field.onkeydown = (e) => {
+          if (e.key === "Enter") {
+            confirm();
+          }
+        };
+        const modal = document.getElementById("input-modal");
+        modal.classList.remove("hidden");
+        currentPage = "input-modal";
+        navigationHistory.push("input-modal");
+        updateBackButtonVisibility();
+        setTimeout(() => field.focus(), 50);
+
+        function close() {
+          modal.classList.add("hidden");
+          if (navigationHistory[navigationHistory.length - 1] === "input-modal") {
+            navigationHistory.pop();
+          }
+          updateBackButtonVisibility();
+        }
+
+        function confirm() {
+          const val = field.value.trim();
+          close();
+          if (onConfirm) onConfirm(val);
+        }
+
+        document.getElementById("input-modal-cancel").onclick = close;
+        document.getElementById("input-modal-confirm").onclick = confirm;
+      }
+
       // Helper: prompt-like UI flow but non-blocking: open small input then call save
       function saveToAccountPrompt() {
         if (!fbAuth || !fbDB) return systemAlert("Sign in to save to account");
-        const name =
-          prompt("Save name (optional):", `Turn ${state.turnIndex || 0}`) ||
-          `Turn ${state.turnIndex || 0}`;
-        saveToAccount(name);
+        openInputModal(
+          "SAVE GAME",
+          "Enter a name for this save slot (optional).",
+          `Turn ${state.turnIndex || 0}`,
+          (name) => {
+            saveToAccount(name || `Turn ${state.turnIndex || 0}`);
+          }
+        );
       }
       // Save and mark as waiting for next player (asynchronous play helper)
       async function saveAndPassPrompt() {
         if (!fbAuth || !fbDB) return systemAlert("Sign in to save & pass");
-        const saveName =
-          prompt(
-            "Save name (optional):",
-            `Async Turn ${state.turnIndex || 0}`,
-          ) || `Async Turn ${state.turnIndex || 0}`;
+        openInputModal(
+          "SAVE & PASS",
+          "Enter a name for this async save. The next player will be notified.",
+          `Async Turn ${state.turnIndex || 0}`,
+          async (saveName) => {
+            await executeSaveAndPass(saveName || `Async Turn ${state.turnIndex || 0}`);
+          }
+        );
+      }
+
+      async function executeSaveAndPass(saveName) {
         try {
           const user = fbAuth.currentUser;
           if (!user) return systemAlert("Please sign in");
@@ -2959,13 +3064,7 @@
               armies: 1,
               exclusiveOwner: myPlayerIndex,
             };
-            LOCS.push([36, 6, "Estonia", -1]);
-            if (!ADJ["Estonia"]) ADJ["Estonia"] = [];
-            if (!ADJ["Greenland"]) ADJ["Greenland"] = [];
-            if (!ADJ["Greenland"].includes("Estonia"))
-              ADJ["Greenland"].push("Estonia");
-            if (!ADJ["Estonia"].includes("Greenland"))
-              ADJ["Estonia"].push("Greenland");
+            ensureMapMatchesState();
           }
           sa.estonia = true;
           systemAlert("Estonia created and assigned to you", "success");
@@ -3533,18 +3632,22 @@
           systemAlert("SPECTATOR LIMIT REACHED");
           return;
         }
-        const name =
-          prompt("Spectator name:", "SPECTATOR") ||
-          `SPECTATOR_${state.players.length}`;
-        state.players.push({
-          name: name,
-          alive: false,
-          ready: true,
-          cards: [],
-          isSpectator: true,
-        });
-        updateLobbyUI();
-        broadcastState();
+        openInputModal(
+          "ADD SPECTATOR",
+          "Enter a name for the spectator.",
+          `SPECTATOR_${state.players.length}`,
+          (name) => {
+            state.players.push({
+              name: name || `SPECTATOR_${state.players.length}`,
+              alive: false,
+              ready: true,
+              cards: [],
+              isSpectator: true,
+            });
+            updateLobbyUI();
+            broadcastState();
+          }
+        );
       }
       // Host: set AI verbosity level (0-3)
       function setAIVerbosity(v) {
@@ -3628,7 +3731,7 @@
       function finalizeConnection(peer) {
         closeFreqModal();
         // If the game is already running, accept connection as a spectator only
-        if (state.phase !== "LOBBY") {
+        if (state.phase !== "LOBBY" && state.phase !== "GAME_OVER") {
           if (peer)
             try {
               safeSend(peer, JSON.stringify({ type: "SPECTATOR" }));
@@ -3773,7 +3876,7 @@
           } else {
             // Regular state update from host
             state = hydrateGameState(data);
-            if (state.phase !== "LOBBY") {
+            if (state.phase !== "LOBBY" && state.phase !== "GAME_OVER") {
               document.getElementById("overlay-layer").classList.add("hidden");
             } else {
               updateLobbyUI();
@@ -3791,60 +3894,69 @@
       }
       // Throttle writes to RTDB so we do not flood session updates during drag/click bursts
       let lastBroadcastTime = 0;
+      let broadcastTimeout = null;
       const BROADCAST_THROTTLE_MS = 100; // Reduced to 100ms for faster sync
-      function broadcastState() {
+      function broadcastState(force = false) {
         if (!isHost) return;
         updateHUD();
         try {
           updateLobbyUI();
         } catch (e) {}
         const msg = JSON.stringify(state);
+
+        const now = Date.now();
+        if (force || now - lastBroadcastTime >= BROADCAST_THROTTLE_MS) {
+          if (broadcastTimeout) {
+            clearTimeout(broadcastTimeout);
+            broadcastTimeout = null;
+          }
+          executeBroadcast(msg);
+        } else if (!broadcastTimeout) {
+          broadcastTimeout = setTimeout(() => {
+            broadcastTimeout = null;
+            executeBroadcast(JSON.stringify(state));
+          }, BROADCAST_THROTTLE_MS - (now - lastBroadcastTime));
+        }
+      }
+
+      async function executeBroadcast(msg) {
+        lastBroadcastTime = Date.now();
         console.log(
           "[HOST][BROADCAST] updating RTDB session state, phase=",
           state.phase,
         );
         try {
           if (currentGameId && sessionRepo) {
-            const now = Date.now();
-            if (now - lastBroadcastTime >= BROADCAST_THROTTLE_MS) {
-              lastBroadcastTime = now;
-              sessionMeta = Object.assign({}, sessionMeta || {}, {
-                sessionId: currentGameId,
-                hostUid: myUID,
-                status:
-                  state.phase === "LOBBY"
-                    ? "waiting"
-                    : state.phase === "GAME_OVER"
-                      ? "completed"
-                      : "active",
-                phase: state.phase,
-                currentTurn: state.turnIndex,
-                reserves: state.reserves,
-                cardTradeValue: state.cardTradeValue,
-                hostOffline: false,
-              });
-              const snapshot = serializeStateForSession(state);
-              sessionRepo
-                .syncRosterFromState(currentGameId, snapshot)
-                .catch((e) => console.error("[HOST] roster sync failed:", e));
-              sessionRepo
-                .publishState(currentGameId, sessionMeta, snapshot)
-                .catch((e) =>
-                  console.error("[HOST] session publish failed:", e),
-                );
-              if (state.phase === "GAME_OVER") {
-                archiveCompletedMatch().catch((e) =>
-                  console.error("[HOST] match archive failed:", e),
-                );
-              }
-              console.log("[HOST][BROADCAST] RTDB write (throttled)");
-            } else {
-              console.log(
-                "[HOST][BROADCAST] skipped (throttled), next write in",
-                BROADCAST_THROTTLE_MS - (now - lastBroadcastTime),
-                "ms",
+            sessionMeta = Object.assign({}, sessionMeta || {}, {
+              sessionId: currentGameId,
+              hostUid: myUID,
+              status:
+                state.phase === "LOBBY"
+                  ? "waiting"
+                  : state.phase === "GAME_OVER"
+                    ? "completed"
+                    : "active",
+              phase: state.phase,
+              currentTurn: state.turnIndex,
+              reserves: state.reserves,
+              cardTradeValue: state.cardTradeValue,
+              hostOffline: false,
+            });
+            const snapshot = serializeStateForSession(state);
+            sessionRepo
+              .syncRosterFromState(currentGameId, snapshot)
+              .catch((e) => console.error("[HOST] roster sync failed:", e));
+            sessionRepo
+              .publishState(currentGameId, sessionMeta, snapshot)
+              .catch((e) =>
+                console.error("[HOST] session publish failed:", e),
+              );
+            if (state.phase === "GAME_OVER") {
+              archiveCompletedMatch().catch((e) =>
+                console.error("[HOST] match archive failed:", e),
               );
             }
+            console.log("[HOST][BROADCAST] RTDB write executed");
           }
           try {
             localStorage.setItem("wopr_autosave", msg);
@@ -3852,7 +3964,7 @@
         } catch (e) {
           console.error("[BROADCAST] update failed", e);
         }
-        wlog("broadcastState", {
+        wlog("executeBroadcast", {
           turnIndex: state.turnIndex,
           phase: state.phase,
           players: state.players.length,
@@ -4869,10 +4981,27 @@
               ds.attacksLost = (ds.attacksLost || 0) + 1;
             }
           } catch (e) {}
+          const defenderIdx = def.owner;
           def.owner = state.turnIndex;
           def.armies = aC;
           atk.armies -= aC;
           state.selected = null;
+
+          // Transfer cards if player eliminated
+          if (isPlayerDead(defenderIdx)) {
+            const victim = state.players[defenderIdx];
+            const killer = state.players[state.turnIndex];
+            if (victim && killer && victim.cards && victim.cards.length > 0) {
+              killer.cards = (killer.cards || []).concat(victim.cards);
+              state.chat.push({
+                name: "SYSTEM",
+                msg: `${killer.name} eliminated ${victim.name} and seized ${victim.cards.length} cards!`
+              });
+              victim.cards = [];
+            }
+            victim.alive = false;
+          }
+
           checkWinCondition();
           // Host AI comments immediately on conquest events
           try {
@@ -5029,6 +5158,10 @@
         state.cardTradeValue = v;
         
         state.players[pid].cards = cards;
+
+        // update stats
+        ensureStats(pid);
+        state.players[pid].stats.cardsTraded = (state.players[pid].stats.cardsTraded || 0) + 1;
       }
 
       function advancePhase() {
@@ -5521,11 +5654,13 @@
         return owned.length === 0;
       }
       function checkWinCondition() {
-        if (
-          [
-            ...new Set(Object.values(state.territories).map((t) => t.owner)),
-          ].filter((o) => o !== -1).length === 1
-        ) {
+        const aliveOwners = new Set();
+        Object.values(state.territories).forEach(t => {
+          if (t.owner !== -1 && !isPlayerDead(t.owner)) {
+            aliveOwners.add(t.owner);
+          }
+        });
+        if (aliveOwners.size === 1) {
           state.phase = "GAME_OVER";
           broadcastState();
           try {
@@ -5545,10 +5680,25 @@
         document.getElementById("login-panel").classList.add("hidden");
         document.getElementById("lobby-panel").classList.add("hidden");
         document.getElementById("victory-panel").classList.remove("hidden");
-        document.getElementById("winner-name").innerText =
-          state.players[state.turnIndex].name;
-        document.getElementById("winner-name").style.color =
-          P_COLORS[state.turnIndex];
+        const winner = state.players[state.turnIndex];
+        document.getElementById("winner-name").innerText = winner.name;
+        document.getElementById("winner-name").style.color = P_COLORS[state.turnIndex];
+
+        // Match Statistics summary
+        let statsHtml = '<h3 class="text-yellow-500 font-bold border-b border-yellow-600 mb-2">MATCH STATISTICS</h3>';
+        state.players.forEach((p, i) => {
+          if (p.isSpectator) return;
+          const s = p.stats || {};
+          statsHtml += `
+            <div class="mb-2">
+              <span style="color:${P_COLORS[i]}" class="font-bold">${p.name}:</span>
+              <span class="text-xs text-white">
+                WON: ${s.attacksWon || 0} | LOST: ${s.armiesLost || 0} | KILLED: ${s.armiesKilled || 0} | TRADES: ${s.cardsTraded || 0}
+              </span>
+            </div>
+          `;
+        });
+        document.getElementById("victory-stats").innerHTML = statsHtml;
       }
       // --- DRAWING ---
       function drawLoop() {
@@ -5558,8 +5708,10 @@
           ctx.clearRect(0, 0, 1000, 750);
           for (let name in ADJ) {
             const from = LOCS.find((l) => l[2] === name);
+            if (!from) continue;
             ADJ[name].forEach((targetName) => {
               const to = LOCS.find((l) => l[2] === targetName);
+              if (!to) return;
               let highlight = false;
               let highlightColor = "#004455";
               // Attack phase: highlight enemy territories
@@ -5689,12 +5841,13 @@
           LOCS.forEach((l) => {
             const [x, y, name, contId] = [l[0] * 10, l[1] * 7.5, l[2], l[3]];
             const t = state.territories && state.territories[name];
+            const fillStyle = contId >= 0 ? C_FILLS[contId] : "#222";
             // Defensive check: skip rendering if territory not yet loaded from Firestore
             if (!t) {
               // Draw placeholder for unloaded territory
               ctx.beginPath();
               ctx.arc(x, y, 18, 0, Math.PI * 2);
-              ctx.fillStyle = C_FILLS[contId];
+              ctx.fillStyle = fillStyle;
               ctx.fill();
               ctx.lineWidth = 1;
               ctx.strokeStyle = "#333";
@@ -5704,7 +5857,7 @@
             const isSelected = state.selected === name;
             ctx.beginPath();
             ctx.arc(x, y, 18, 0, Math.PI * 2);
-            ctx.fillStyle = C_FILLS[contId];
+            ctx.fillStyle = fillStyle;
             ctx.fill();
             ctx.lineWidth = isSelected ? 5 : 3;
             ctx.strokeStyle = t.owner > -1 ? P_COLORS[t.owner] : "#444";
@@ -6060,6 +6213,11 @@
         input.value = "";
       }
       function updateLobbyUI() {
+        if (state.phase !== "LOBBY" && state.phase !== "GAME_OVER") {
+          document.getElementById("lobby-active-controls").classList.remove("hidden");
+        } else {
+          document.getElementById("lobby-active-controls").classList.add("hidden");
+        }
         // Render players (with host-only kick buttons)
         let listHtml = "";
         state.players.forEach((p, i) => {
@@ -6203,6 +6361,9 @@
           myCallSign = "";
           isHost = false;
           myPlayerIndex = -1;
+          // Reset map
+          LOCS = JSON.parse(JSON.stringify(INITIAL_LOCS));
+          ADJ = JSON.parse(JSON.stringify(INITIAL_ADJ));
           // Re-initialize state to defaults
           state = createGameState();
           // Reset DOM panels

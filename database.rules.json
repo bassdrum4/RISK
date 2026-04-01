@@ -1,0 +1,18 @@
+{
+  "rules": {
+    "sessions": {
+      "$session_id": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        "meta": {
+          "hostUid": {
+            ".validate": "newData.isString() && (data.val() == null || data.val() == newData.val())"
+          }
+        },
+        "actions": {
+          ".indexOn": ["createdAt"]
+        }
+      }
+    }
+  }
+}
