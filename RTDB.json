@@ -1,0 +1,45 @@
+{
+  "rules": {
+    "sessions": {
+      "$sessionId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (!data.exists() ? newData.child('meta').child('hostUid').val() === auth.uid : data.child('meta').child('hostUid').val() === auth.uid || (newData.child('meta').child('hostUid').val() === auth.uid && (data.child('meta').child('hostOffline').val() === true || data.child('meta').child('updatedAt').val() < now - 60000)))",
+        "meta": {
+          ".read": "auth != null",
+          ".write": "auth != null && (!data.exists() ? newData.child('hostUid').val() === auth.uid : data.child('hostUid').val() === auth.uid || (newData.child('hostUid').val() === auth.uid && (data.child('hostOffline').val() === true || data.child('updatedAt').val() < now - 60000)))",
+          "nextSlot": {
+            ".write": "auth != null && root.child('sessions').child($sessionId).child('meta').child('hostUid').exists() && newData.isNumber() && (!data.exists() ? newData.val() >= 0 : newData.val() === data.val() + 1)"
+          }
+        },
+        "state": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('sessions').child($sessionId).child('meta').child('hostUid').val() === auth.uid"
+        },
+        "roster": {
+          "$uid": {
+            ".read": "auth != null",
+            ".write": "auth != null && ($uid === auth.uid || root.child('sessions').child($sessionId).child('meta').child('hostUid').val() === auth.uid)"
+          }
+        },
+        "presence": {
+          "$uid": {
+            ".read": "auth != null",
+            ".write": "auth != null && $uid === auth.uid"
+          }
+        },
+        "chat": {
+          "$messageId": {
+            ".read": "auth != null",
+            ".write": "auth != null && (!data.exists() ? newData.child('playerUid').val() === auth.uid : false)"
+          }
+        },
+        "actions": {
+          "$actionId": {
+            ".read": "auth != null",
+            ".write": "auth != null && (!data.exists() ? newData.child('playerUid').val() === auth.uid : root.child('sessions').child($sessionId).child('meta').child('hostUid').val() === auth.uid)"
+          }
+        }
+      }
+    }
+  }
+}
